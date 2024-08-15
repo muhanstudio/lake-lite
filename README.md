@@ -10,6 +10,8 @@ You can open/edit the lake format language document you quoted in your notes in 
 
 ![img.png](img.png)
 
+![demo.mp4](demo.mp4)
+
 1. Create a new language document in lake format
 
 2. View the attachments in the entire library and your newly created language documents, and click the lake file inserted in the notes
