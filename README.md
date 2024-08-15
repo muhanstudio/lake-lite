@@ -1,4 +1,4 @@
-![Update Log](CHANGELOG.md)
+[Update Log](CHANGELOG.md)
 
 ## Introduction
 
