@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>All Documents</title>
+  <link rel="stylesheet" type="text/css" href="doc.css"/>
+  <link rel="stylesheet" type="text/css" href="antd.css"/>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .collapsible {
+      cursor: pointer;
+      padding: 15px;
+      width: 100%;
+      text-align: left;
+      border: none;
+      outline: none;
+      font-size: 16px;
+      background-color: #e0f7fa;
+      color: #00796b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .collapsible:after {
+      content: '+';
+      font-size: 20px;
+      color: #00796b;
+      margin-left: 10px;
+    }
+
+    .collapsible.active:after {
+      content: '-';
+    }
+
+    .collapsible span {
+      font-size: 12px;
+      color: #666;
+      margin-left: 10px;
+    }
+
+    .content {
+      padding: 0 18px;
+      display: none;
+      overflow: hidden;
+      background-color: #ffffff;
+      border: 1px solid #ddd;
+      border-top: none;
+    }
+
+    ul {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    li {
+      margin: 10px 0;
+      padding: 10px;
+      background-color: #ffffff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    button {
+      margin-left: 10px;
+      padding: 5px 10px;
+      background-color: #00796b;
+      color: #ffffff;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #004d40;
+    }
+
+    #refreshAll, #newDocument {
+      margin: 20px 10px 20px 0;
+      padding: 10px 20px;
+      background-color: #004d40;
+    }
+  </style>
+</head>
+<body>
+  <button id="refreshAll">刷新全部</button>
+  <button id="newDocument" onclick="window.location.href='new.html'">新建文档</button>
+
+  <button class="collapsible" id="assetsHeader">
+    存在附件库中的语雀文档 <span id="assetsHint">点击展开</span>
+  </button>
+  <div class="content">
+    <ul id="fileListAssets"></ul>
+  </div>
+
+  <button class="collapsible" id="larkHeader">
+    在思源中创建的语雀文档 <span id="larkHint">点击展开</span>
+  </button>
+  <div class="content">
+    <ul id="fileListLark"></ul>
+  </div>
+
+  <script>
+    const token = 'token';
+    const directoryPaths = {
+      assets: '/data/assets/',
+      lark: '/data/public/lark-editor/lark/'
+    };
+
+    function loadFiles(directoryKey) {
+      const directoryPath = directoryPaths[directoryKey];
+      fetch('http://127.0.0.1:6806/api/file/readDir', {
+        method: 'POST',
+        headers: { 'Authorization': `Token ${token}` },
+        body: JSON.stringify({ path: directoryPath })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.code === 0) {
+          const fileList = document.getElementById(`fileList${capitalizeFirstLetter(directoryKey)}`);
+          fileList.innerHTML = '';
+
+          const files = result.data.filter(file => !file.isDir && file.name.endsWith('.lake'));
+          files.forEach(file => {
+            const listItem = document.createElement('li');
+            listItem.innerHTML = `
+              <span>${file.name} (Updated: ${new Date(file.updated * 1000).toLocaleString()})</span>
+              <div>
+                <button onclick="window.location.href='edit.html?path=${directoryPath}${file.name}'">编辑</button>
+                <button onclick="window.location.href='preview.html?path=${directoryPath}${file.name}'">预览</button>
+                <button onclick="deleteFile('${directoryPath}${file.name}', '${directoryKey}')">删除</button>
+              </div>
+            `;
+            fileList.appendChild(listItem);
+          });
+
+          document.getElementById(`${directoryKey}Header`).firstChild.textContent = `${directoryKey === 'assets' ? '存在附件库中的语雀文档' : '在思源中创建的语雀文档'}（${files.length}篇）`;
+        } else {
+          console.error('Error reading directory:', result.msg);
+        }
+      })
+      .catch(error => console.error('Error fetching file list:', error));
+    }
+
+    function deleteFile(filePath, directoryKey) {
+      if (confirm('确定删除这个文档吗？')) {
+        fetch('http://127.0.0.1:6806/api/file/removeFile', {
+          method: 'POST',
+          headers: { 'Authorization': `Token ${token}` },
+          body: JSON.stringify({ path: filePath })
+        })
+        .then(response => response.json())
+        .then(result => {
+          if (result.code === 0) {
+            alert('删除成功');
+            loadFiles(directoryKey);
+          } else {
+            console.error('Error deleting file:', result.msg);
+          }
+        })
+        .catch(error => console.error('Error deleting file:', error));
+      }
+    }
+
+    function capitalizeFirstLetter(string) {
+      return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    document.getElementById('refreshAll').addEventListener('click', () => {
+      loadFiles('assets');
+      loadFiles('lark');
+    });
+
+    document.querySelectorAll('.collapsible').forEach(button => {
+      button.addEventListener('click', function() {
+        this.classList.toggle('active');
+        const content = this.nextElementSibling;
+        const hint = this.querySelector('span');
+        if (content.style.display === 'block') {
+          content.style.display = 'none';
+          hint.textContent = '点击展开';
+        } else {
+          content.style.display = 'block';
+          hint.textContent = '点击折叠';
+        }
+      });
+    });
+
+    window.onload = () => {
+      loadFiles('assets');
+      loadFiles('lark');
+    };
+  </script>
+</body>
+</html>

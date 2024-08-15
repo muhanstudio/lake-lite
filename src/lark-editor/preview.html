@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Preview Document</title>
+    <link rel="stylesheet" type="text/css" href="doc.css"/>
+    <link rel="stylesheet" type="text/css" href="antd.css"/>
+    <style>
+        #title {
+            font-weight: bold;
+            font-size: 24px; /* 调整字体大小 */
+            text-align: center; /* 居中对齐 */
+            margin: 20px 0; /* 添加上下边距 */
+        }
+
+        #switch-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000; /* 确保按钮悬浮在最顶层 */
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<button id="switch-button" onclick="switchToEdit()">编辑</button>
+<h1 id="title"></h1>
+<div id="root" class="ne-doc-major-viewer"></div>
+<script>
+    function switchToEdit() {
+        const filePath = new URLSearchParams(window.location.search).get('path');
+        const encodedFilePath = encodeURIComponent(filePath); // 确保路径被正确编码
+        window.location.href = `edit.html?path=${encodedFilePath}`;
+    }
+
+    const token = 'token';
+    let filePath = new URLSearchParams(window.location.search).get('path');
+    filePath = decodeURIComponent(filePath); // 确保路径被正确解码
+
+    window.onload = function () {
+        const {createOpenViewer} = window.Doc;
+
+        // 创建阅读器，并显式传递文件相关配置（尽管不使用）
+        const viewer = createOpenViewer(document.getElementById('root'), {
+            image: {
+                isCaptureImageURL: () => false,
+                createUploadPromise: () => Promise.reject(),
+            },
+            file: {
+                createUploadPromise: () => Promise.reject(),
+                canDownload: (cardData) => {
+                    return true; // 允许下载
+                },
+                onViewerInlineFileClick: (e, ui) => {
+                    window.open(ui._cardData._cardValue.src, '_blank');  // 在新窗口中打开链接
+                }
+            },
+            video: {
+                createUploadPromise: () => Promise.reject(),
+            }
+        });
+
+        // 获取文件内容并加载
+        fetch('http://127.0.0.1:6806/api/file/getFile', {
+            method: 'POST',
+            headers: {'Authorization': `Token ${token}`},
+            body: JSON.stringify({path: filePath}) // 使用解码后的路径
+        })
+            .then(response => response.text())
+            .then(data => {
+                viewer.setDocument('text/lake', data);
+                document.getElementById('title').textContent = filePath.split('/').pop().split('.')[0];
+            })
+            .catch(error => console.error('Error loading document:', error));
+    }
+</script>
+<script crossorigin src="react.production.min.js"></script>
+<script crossorigin src="react-dom.production.min.js"></script>
+<script src="doc.umd.js"></script>
+</body>
+</html>

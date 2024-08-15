@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>New Document</title>
+</head>
+<body>
+  <script>
+    const token = 'token';
+    const timestamp = Date.now();
+    const filePath = `/data/public/lark-editor/lark/${timestamp}.lake`;
+
+    // 创建新的 .lake 文件并跳转到 edit.html 页面
+    const lakeContent = '';  // 初始内容可以为空
+    const lakeName = `${timestamp}.lake`;
+    const formData = new FormData();
+    formData.append('file', new File([lakeContent], lakeName, { type: 'text/lake' }));
+    formData.append('path', filePath);
+
+    fetch('http://127.0.0.1:6806/api/file/putFile', {
+      method: 'POST',
+      headers: { 'Authorization': `Token ${token}` },
+      body: formData
+    })
+    .then(response => response.json())
+    .then(() => {
+      window.location.href = `edit.html?path=${filePath}`;
+    })
+    .catch(error => console.error('Error creating new file:', error));
+  </script>
+</body>
+</html>

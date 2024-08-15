@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>All Documents</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: transparent;
+      margin: 0;
+      color: #00FF00; /* 亮绿色字体 */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #searchContainer {
+      width: 200px;
+      margin: 20px 0;
+      position: relative;
+    }
+
+    #searchInput {
+      width: 100%;
+      border-radius: 20px;
+      border: 1px solid #00FF00;
+      background-color: transparent;
+      color: #00FF00;
+      outline: none;
+      height: 30px;
+    }
+
+    #searchIcon {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      pointer-events: none;
+    }
+
+    .collapsible {
+      cursor: pointer;
+      width: 100%;
+      max-width: 600px;
+      background-color: transparent;
+      color: #00a200;
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      border-radius: 20px;
+      border-width: 1px;
+      margin-bottom: 5px;
+      outline: none;
+    }
+
+    .indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 10px;
+      border: solid #00FF00;
+      border-width: 0 2px 2px 0;
+      transform: rotate(-45deg);
+      transition: transform 0.3s;
+    }
+
+    .collapsible.active .indicator {
+      transform: rotate(45deg);
+    }
+
+    .content {
+      padding: 0 18px;
+      display: none;
+      overflow: hidden;
+      background-color: transparent;
+      font-size: 14px;
+      max-width: 600px;
+    }
+
+    ul {
+      padding: 0;
+      margin: 0;
+    }
+
+    li {
+      background-color: transparent;
+      border: none;
+      color: #00FF00;
+      cursor: pointer;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="searchContainer">
+    <input type="text" id="searchInput" placeholder="搜索文档...">
+    <svg id="searchIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M10 2a8 8 0 106.32 14.906l4.387 4.387a1 1 0 001.414-1.414l-4.387-4.387A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/>
+    </svg>
+  </div>
+
+  <button class="collapsible" id="assetsHeader">
+    <span class="indicator"></span><span id="assetsText">存在附件库中的语雀文档</span>
+  </button>
+  <div class="content" id="assetsContent">
+    <ul id="fileListAssets"></ul>
+  </div>
+
+  <button class="collapsible" id="larkHeader">
+    <span class="indicator"></span><span id="larkText">在思源中创建的语雀文档</span>
+  </button>
+  <div class="content" id="larkContent">
+    <ul id="fileListLark"></ul>
+  </div>
+
+  <script>
+    const token = 'token';
+    const directoryPaths = {
+      assets: '/data/assets/',
+      lark: '/data/public/lark-editor/lark/'
+    };
+
+    // 加载文件列表的函数
+    function loadFiles(directoryKey) {
+      const directoryPath = directoryPaths[directoryKey];
+      fetch('http://127.0.0.1:6806/api/file/readDir', {
+        method: 'POST',
+        headers: { 'Authorization': `Token ${token}` },
+        body: JSON.stringify({ path: directoryPath })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.code === 0) {
+          const fileList = document.getElementById(`fileList${capitalizeFirstLetter(directoryKey)}`);
+          fileList.innerHTML = '';
+
+          const files = result.data.filter(file => !file.isDir && file.name.endsWith('.lake'));
+          files.forEach(file => {
+            const listItem = document.createElement('li');
+            listItem.textContent = file.name;
+            listItem.onclick = () => {
+              window.parent.postMessage({ action: 'openlaketab', goto: `preview.html?path=${directoryPath}${file.name}` }, '*');
+            };
+            fileList.appendChild(listItem);
+          });
+
+          document.getElementById(`${directoryKey}Text`).textContent = `${directoryKey === 'assets' ? '存在附件库中的语雀文档' : '在思源中创建的语雀文档'}（${files.length}篇）`;
+        } else {
+          console.error('Error reading directory:', result.msg);
+        }
+      })
+      .catch(error => console.error('Error fetching file list:', error));
+    }
+
+    // 首字母大写函数
+    function capitalizeFirstLetter(string) {
+      return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    // 为每个可折叠按钮添加事件监听器
+    document.querySelectorAll('.collapsible').forEach(button => {
+      button.addEventListener('click', function() {
+        this.classList.toggle('active');
+        const content = this.nextElementSibling;
+        if (content.style.display === 'block') {
+          content.style.display = 'none';
+          localStorage.setItem(content.id, 'collapsed'); // 保存折叠状态
+        } else {
+          content.style.display = 'block';
+          localStorage.setItem(content.id, 'expanded'); // 保存展开状态
+        }
+      });
+
+      // 从localStorage中读取状态并设置初始显示状态
+      const content = button.nextElementSibling;
+      const state = localStorage.getItem(content.id);
+      if (state === 'expanded') {
+        button.classList.add('active');
+        content.style.display = 'block';
+      }
+    });
+
+    // 搜索输入框事件监听器
+    document.getElementById('searchInput').addEventListener('input', function() {
+      const filter = this.value.toLowerCase();
+      document.querySelectorAll('li').forEach(item => {
+        if (item.textContent.toLowerCase().includes(filter)) {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+
+    // 页面加载时初始化文件列表
+    window.onload = () => {
+      loadFiles('assets');
+      loadFiles('lark');
+    };
+  </script>
+</body>
+</html>
